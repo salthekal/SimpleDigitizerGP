@@ -28,3 +28,7 @@ Explain how others can contribute to your project. Provide guidelines for submit
 ## License
 
 GNU General Public License v3.0
+
+
+'d0_x' : ROOT.TGraphErrors(chgProjProfileX_up), 'd1_y' : ROOT.TGraphErrors(chgProjProfileX_up)
+MEMO : Understand how the errors along the X are calculated 
