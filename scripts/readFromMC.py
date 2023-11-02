@@ -1,5 +1,5 @@
 #################################################################################################
-# @info description                                                     #
+# @info description                                                                 #
 # @date 23/10/26                                                                                #
 #                                                                                               #
 
@@ -27,7 +27,7 @@ class readFromMc():
         Parameters
         ----------
             rFname (str) : Filename of the MC ROOT file containing the data
-            
+            bunchParNb (int) : number of particles in a bunch
             cce (float) : Charge collection efficiency of the sensor for the bare geometrical projection of the dep chg. to proj chg.
             avgPairEn (float) : Average energy required to create an electron-hole pair in the sensor (in eV)
         
@@ -379,7 +379,7 @@ class readFromMc():
     #################################################################################################
 
     @dispatch(int, float, float)
-    def readProjProfilesFromROOT(self, bunchParNb: int, cce: float, avgPairEn: float) -> dict:
+    def readProjProfilesFromROOT(self, bunchParNb: int, cce: float, avgPairEn: float) -> np.array:
         """
         Loads the MC data from the fname, slice the total energy deposition in the sensor into bunches with 'bunchParNb' particles each,
         and returns a collection of TGraphErrors with the projected charge profiles (cce and avgPairEn are used for this) whose strip charges have also
@@ -395,7 +395,7 @@ class readFromMc():
         
         Returns
         -------
-            write me        
+            writeme (np.array) : text   
         """
         
         # Attempt to load from file
@@ -472,13 +472,13 @@ class readFromMc():
     
     
     @dispatch()
-    def readProjProfilesFromROOT(self) -> dict:
+    def readProjProfilesFromROOT(self) -> np.array:
         return self.readProjProfilesFromROOT(self.bunchParNb, self.cce, self.avgPairEn)
 
 
 
     @dispatch(int, int, int, float, float)
-    def readProjProfilesFromROOT(self, bunchParNb: int, pdg: int, cce: float, avgPairEn: float) -> dict:
+    def readProjProfilesFromROOT(self, bunchParNb: int, pdg: int, cce: float, avgPairEn: float) -> np.array:
         (self.logging).error("I'm not implemented yet")
         raise Exception("I'm not implemented yet")
     
@@ -492,5 +492,5 @@ if __name__ == "__main__":
     rMCClass = readFromMc("build/dummyRun_100k.root", 10000, 0.2, 27.0)
     # Enable debug
     #rMCClass.logging.setLevel(10)
-    rMCClass.readProjProfilesFromROOT()
+    print(rMCClass.readProjProfilesFromROOT())
     exit()

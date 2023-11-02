@@ -1,8 +1,8 @@
 #################################################################################################
-# @info description                                                     #
+# @info Frontend class simulating the response of the electronics to the profile of charge at   #
+#       the strips                                                                              #
 # @date 23/10/26                                                                                #
 #                                                                                               #
-
 #################################################################################################
 from multipledispatch import dispatch
 from matplotlib import pyplot as plt
@@ -14,452 +14,177 @@ import ROOT
 
 
 class frontend:
+    """
+    # Description
+    Class simulating the effect of the frontend electronics to the profile of projected charge at the strips. There are several components of this class, which can be configured by the user:
+    1. Input noise (fNoise parameter in e unit). Adds random gaussian noise to the input profile of charge. It simulated some electronics noise before the pre-amplification stage takes place.
+    2. Amplification, controlled by the fGain parameters (units of mV/pC). In this context, the pre-amplification module is effectively simulating the charge collection at the input capacitor and the actual amplification from the OpAmp amplifier.
+    3. 
+    
+    ## Parameters
+    ----------
+        fNoise (float) : Front-end electronics noise (in electron units) and internally converted in Coulomb
+        iADCres (int) : Number of bits of the analog-to-digital converter (12-bit -> 12)
+        fOlScale (float) : Full scale range that the frontend is capable of digitizing (in electron units)
+        fGain (float) : Amplifier gain (ration between final charge and initial charge)
+        vChgShrCrossTalkMap (list) : Cross-talk charge sharing percentages (es. [0.1,0.002, 0.0003] means that 0.1 is shared between strips at 1 distance, 0.002 between strips at distance 2, etc.)
+    """
+    
     # frontend class logger
     logging = create_logger("frontend")
     
     
-    @dispatch(float, int, float, float, float, list)
-    def __init__(self, feNoise: float, adcResolution: int, vref: float, lGain: float, hGain: float, chgShrCrossTalkMap: list):
+    # Initialize the front-end class internal variables
+    def initialize(self, fNoise: float, iADCres: int, fOlScale: float, fGain: float, vChgShrCrossTalkMap: list):
         """
-        Create a front-end class representing the effect of a certain front-end setup (electronics) to the initial profile
+        Initialize the front-end class internal variables
         
         Parameters
         ----------
-            feNoise (float) : Front-end electronics noise (in electron units)
-            adcResolution (float) : Bit depth of the ADC converter (number of bits)
-            vref (float) : Delete me
-            lGain (float) : Pre-amplifier gain for low gain channel (in mV/pC)
-            hGain (float) : Pre-amplifier gain for high gain channel (in mV/pC)
-            chgShrCrossTalkMap (float) : List with percentages of the cross-talk charge sharing between the nearest neighbours strips (es. [0.1,0.002, 0.0003] means that 0.1 is shared between strips at 1 distance, 0.002 between strips at distance 2 and so on)
+            fNoise (float) : Front-end electronics noise (in electron units) and internally converted in Coulomb
+            iADCres (int) : Number of bits of the analog-to-digital converter (12-bit -> 12)
+            fOlScale (float) : Full scale range that the frontend is capable of digitizing (in electron units)
+            fGain (float) : Amplifier gain (ration between final charge and initial charge)
+            vChgShrCrossTalkMap (list) : Cross-talk charge sharing percentages (es. [0.1,0.002, 0.0003] means that 0.1 is shared between strips at 1 distance, 0.002 between strips at distance 2, etc.)
         
+        Returns
+        -------
+            None
         """
         
         # Set internal variables of the class with the external parameters
-        self.feNoise = feNoise
-        self.adcResolution = adcResolution
-        self.vref = vref
-        self.lGain = lGain
-        self.hGain = hGain
-        self.chgShrCrossTalkMap = chgShrCrossTalkMap
+        self.fNoise             = fNoise * (1.602176e-19)
+        self.iADCres            = iADCres
+        self.fOlScale           = fOlScale * (1.602176e-19)
+        self.fGain              = fGain
+        self.chgShrCrossTalkMap = vChgShrCrossTalkMap
         
-        self.maxADC = 2**self.adcResolution - 1   
-        self.adcScale = self.vref/self.maxADC #in units of V/count
+        self.maxADC             = np.power(2, self.iADCres) - 1  
+        #self.adcScale           = self.vref/self.maxADC #in units of V/count
         
         
-        if 2*sum(chgShrCrossTalkMap) > 1.0:
+        if 2*sum(vChgShrCrossTalkMap) > 1.0:
             (self.logging).warning("Sum of charge sharing fractions cannot exceed 0.5. Cross talk will be disabled")
             self.chgShrCrossTalkMap = [0]
-            
-            
-        msg = f"""FRONT-END settings are:
-        fenoise             : {self.feNoise} e
-        adcresolution       : {self.adcResolution}-bit
-        vref                : {self.vref} V
-        lgain               : {self.lGain} mV/pC
-        hgain               : {self.hGain} mV/pC
-        chgShrCrossTalkMap  : {self.chgShrCrossTalkMap} %
         
-        Calculated quantities:
-        maxADC          : {self.maxADC}
-        adcScale        : {self.adcScale}\n----------------
+        if fGain <= 0:
+            (self.logging).warning(f"Negative gain value of {fGain}. Defaulting to 1.0")
+            self.fGain = 1.0
+            
+        msg = f"""Frontend settings are:
+        fNoise              : {fNoise} e or {self.fNoise:.2f} in C
+        iADCres             : {self.iADCres}-bit
+        fOlScale            : {fOlScale} e or {self.fOlScale:.2f} in C
+        fGain               : {fGain} mV/pC or {self.fGain:.2f} in V/C
+        chgShrCrossTalkMap  : {self.chgShrCrossTalkMap} % \n----------------
         """
         (self.logging).info(msg)
+     
     
-    # Overload of the init class function for taking an input projProfile profile and processing with default parameters
-    @dispatch(ROOT.TH1D, float, int, float, float, float, list)
-    def __init__(self, projChgProfile: ROOT.TH1D, feNoise: float, adcResolution: int, vref: float, lGain: float, hGain: float, chgShrCrossTalkMap: list):
-        (self.logging).error("I'm not implemented yet")
-        raise Exception("I'm not implemented yet")
-    
-    
-    # Overload of the init class function for loading profile from scratch and with default parameters
-    @dispatch()
-    def __init__(self):
-        return (self.__init__)(feNoise = 51.735, adcResolution = 13, vref = 901.6e-3, lGain = 50.366, hGain = 503.66, chgShrCrossTalkMap = [0])
-    
-    
-    
-    
-    # Apply the front-end noise to the profile of charge collected at the strips
-    def applyFENoise(self, chgStripProfile: ROOT.TH1D, plotting=False) -> ROOT.TH1D:
+    def __init__(self, fNoise: float, iADCres: int, fOlScale: float, fGain: float, vChgShrCrossTalkMap: list, projChgProfiles: np.array):
         """
-        Apply the front-end noise to the profile of charge collected at the strips
+        Overload of the init class function for taking an input projProfile profile and processing with default parameters
         
-        Paramters
+        Parameters
         ----------
-            chgStripProfile (ROOT.TH1D) : profile of charge collected at the strips
-            plotting (bool) : if True, plots the profile with the noise applied
+            fNoise (float) : Front-end electronics noise (in electron units) and internally converted in Coulomb
+            iADCres (int) : Number of bits of the analog-to-digital converter (12-bit -> 12)
+            fOlScale (float) : Full scale range that the frontend is capable of digitizing (in electron units)
+            fGain (float) : Amplifier gain (ration between final charge and initial charge)
+            vChgShrCrossTalkMap (list) : Cross-talk charge sharing percentages (es. [0.1,0.002, 0.0003] means that 0.1 is shared between strips at 1 distance, 0.002 between strips at distance 2, etc.)
+            projChgProfiles (np.array) : Array with the projected charge profiles for the hor./vert. bunches
             
         Returns
         -------
-            chgStripPostProcessedProfile (ROOT.TH1D) : profile of charge collected at the strips with front-end noise applied
+            None
         """
         
-        chgStripProfileCp = chgStripProfile.Clone()
+        # Copy the list of TGraphErrors internally so that the input objects are not modified
+        self.projChgProfiles = np.array([{'d0_x' : item['d0_x'].Clone(), 'd1_y': item['d1_y'].Clone()} for item in projChgProfiles])
+        (self.logging).info("Called with external profiles")
+        self.initialize(fNoise, iADCres, fOlScale, fGain, vChgShrCrossTalkMap)
+    
+    
+    # Apply a gaussian smearing noise to the input with sigma fNoise to the input profile
+    @dispatch(ROOT.TGraphErrors)
+    def applyNoise(self, chgStripProfile: ROOT.TGraphErrors):
+        """
+        Apply a gaussian smearing noise to the input with sigma fNoise to the input profile
+        
+        Paramters
+        ----------
+            chgStripProfile (ROOT.TGraphErrors) : profile of charge collected at the strips
+        """
         
         # Set the name, title and vertical axis title
-        chgStripProfileCp.SetTitle(chgStripProfileCp.GetTitle().replace("Charge collected", "Charge collected (plus FE-noise)"))
-        chgStripProfileCp.SetName(chgStripProfileCp.GetName().replace('Proj', 'ProjFE'))    #chgProjFEProfileY
-        chgStripProfileCp.GetYaxis().SetTitle("charge collected with FE-noise [C]")
-        chgStripProfileCp.GetXaxis().CenterTitle()
-        chgStripProfileCp.GetYaxis().CenterTitle()
+        chgStripProfile.SetTitle(chgStripProfile.GetTitle().replace("Charge collected", "Charge collected (plus FE-noise)"))
+        chgStripProfile.SetName(chgStripProfile.GetName().replace('Proj', 'ProjFE'))    #chgProjFEProfileY
+        chgStripProfile.GetYaxis().SetTitle("charge collected with FE-noise [C]")
+        #chgStripProfileCp.GetXaxis().CenterTitle()
+        #chgStripProfileCp.GetYaxis().CenterTitle()
+
+        for i in range(chgStripProfile.GetN()):
+            noise = np.random.normal(0, self.fNoise)
+            chgStripProfile.SetPointY(i, chgStripProfile.GetPointY(i) + noise)
+            chgStripProfile.SetPointError(i, chgStripProfile.GetErrorX(i), np.sqrt(chgStripProfile.GetErrorY(i)*chgStripProfile.GetErrorY(i) + self.fNoise*self.fNoise) )
+
+        ## Diagnostic plots
+        #if plotting == 10:
+        #    view, ax = plt.subplots()
+        #    view.suptitle("Profile with noise applied")
+        #    ax.set_xlabel("strip no.")
+        #    ax.set_ylabel("signal+noise [C]")
+        #    ax.plot(noiseVals, label=f"noise set value is {np.round(self.fNoise,1)} e.")
+        #    view.savefig("applyNoise.pdf")
+        #    plt.show()
         
-        # This array contains the front-end values only, with the purpose of be used for debugging/inspection
-        if plotting: noiseVals = np.zeros(chgStripProfileCp.GetNbinsX())
-        #print("Number of entries:", chgStripProfiCp.GetEntries())
-        # Each bin content value is summed to a random value extracted from
-        # a gaussian with mean 0 and sigma given by the feNoise parameter, converted in electric charge 
-        for i in range(1, chgStripProfileCp.GetNbinsX() + 1):
-            #print(f"Bin {i} has content {chgStripProfile.GetBinContent(i)}") 
-            val = chgStripProfileCp.GetBinContent(i)
-            newVal = val +  np.random.normal(0, self.feNoise * 1.602176e-19 )
-            chgStripProfileCp.SetBinContent(i, newVal)
-            
-            if plotting: noiseVals[i-1] = newVal
-
-            # Get existing error
-            existing_error = chgStripProfileCp.GetBinError(i)
-            
-            # Calculate combined error
-            combined_error = np.sqrt( existing_error**2 + (self.feNoise*1.602176e-19)**2 )
-            # set bin error
-            chgStripProfileCp.SetBinError(i, combined_error)
-
-            # Debug 
-            #print(newVal) 
-            #print(val, np.random.normal(0, self.feNoise * 1.602176e-19 ))
-
-        # Diagnostic plots
-        if plotting == 10:
-            view, ax = plt.subplots()
-            view.suptitle("Profile with noise applied")
-            ax.set_xlabel("strip no.")
-            ax.set_ylabel("signal+noise [C]")
-            ax.plot(noiseVals, label=f"noise set value is {np.round(self.feNoise,1)} e.")
-            view.savefig("applyFENoise.pdf")
-            np.save("thisPlot.bin", view, allow_pickle=True)
-            plt.show()
-            
-        return chgStripProfileCp
     
-    # TODO double check if the vaules sotred in .txt are correct
-    def applyFENoisePerBunch(self, chgStripProfile: ROOT.TH1D, noise_range: np.array, plotting: bool) -> dict:
-        """
-        Apply the front-end noise to the profile of charge collected at the strips for each bunch
-        
-        Parameters
-        ----------
-            chgStripProfiles (dict) : dictionary of profiles of charge collected at the strips with bunch numbers as keys
-            noise_range (tuple) : range of noise values to be applied, in the format (start, stop, step)
-        
-        Returns
-        -------
-            chgStripPostProcessedProfiles (dict) : dictionary of profiles of charge collected at the strips with front-end noise applied
-        """
+    # Apply a gaussian smearing noise to the input with sigma fNoise to the array of hor./vert. bunch profiles
+    @dispatch()
+    def applyNoise(self):
+        for entry in self.projChgProfiles:
+            self.applyNoise(entry['d0_x'])
+            self.applyNoise(entry['d1_y'])
 
-        average_noises = {}
-        # Loop over the bunchID and noise values
-        for bunchID, feNoise in enumerate(noise_range):
-            # Initialize chgStripProfileCp using the input chgStripProfile
-            chgStripProfileCp = chgStripProfile.Clone()
-
-            # Set the name, title, and vertical axis title
-            chgStripProfileCp.SetTitle(chgStripProfileCp.GetTitle().replace("Charge collected", f"Charge collected (plus FE-noise for Bunch {bunchID})"))
-            chgStripProfileCp.SetName(chgStripProfileCp.GetName().replace('Proj', f'ProjFE_Bunch{bunchID}'))
-            chgStripProfileCp.GetYaxis().SetTitle(f"charge collected with FE-noise for Bunch {bunchID} [C]")
-            chgStripProfileCp.GetXaxis().CenterTitle()
-            chgStripProfileCp.GetYaxis().CenterTitle()
-
-            # This array contains the front-end values only, with the purpose of being used for debugging/inspection
-            if (self.logging).level == 10:
-                noiseVals = np.zeros(chgStripProfileCp.GetNbinsX())
-
-            # Each bin content value is summed to a random value extracted from
-            # a Gaussian with mean 0 and sigma given by the feNoise parameter, converted into electric charge
-            for j in range(1, chgStripProfileCp.GetNbinsX() + 1):
-                val = chgStripProfileCp.GetBinContent(j)
-                rndmNoise = np.random.normal(0, feNoise * 1.602176e-19)
-                newVal = val + rndmNoise
-                chgStripProfileCp.SetBinContent(j, newVal)
-
-                if (self.logging).level == 10:
-                    noiseVals[j - 1] = newVal
-
-                # Get existing error
-                existing_error = chgStripProfileCp.GetBinError(j)
-
-                # Calculate combined error
-                combined_error = np.sqrt(existing_error ** 2 + (feNoise * 1.602176e-19) ** 2)
-                # set bin error
-                chgStripProfileCp.SetBinError(j, combined_error)
-            
-            # Diagnostic plots
-            if (self.logging).level == 10:
-                view, ax = plt.subplots()
-                view2, bx = plt.subplots()
-                view.suptitle("Profile with noise applied")
-                view2.suptitle(f"Profile of noise applied for Bunch {bunchID}")
-                ax.set_xlabel("strip no.")
-                ax.set_ylabel("signal+noise [C]")
-                bx.set_xlabel("strip no.")
-                bx.set_ylabel("noise [C]")
-                ax.plot(noiseVals, label=f"noise set value for Bunch {bunchID} is {np.round(feNoise, 1)} e.")
-                bx.plot(rndmNoise, label=f"noise set value for Bunch {bunchID} is {np.round(feNoise, 1)} e.")
-                view.show()
-                view2.show()
-                plt.show()
     
-            average_noises[bunchID] = (rndmNoise, combined_error)
-
-        # Write average noise values and errors to a .txt file
-        with open('average_noises.txt', 'w') as f:
-            for bunchID, (mean, std) in average_noises.items():
-                f.write(f'Bunch {bunchID}:  noise = {mean}, error = {std}\n')
-            f.close()
-
-        return chgStripProfileCp
-
-
-    # Apply the front-end amplification to the profile of charge projected at the strips
-    def applyAmplification(self, chgStripWithFE: ROOT.TH1D) -> ROOT.TH1D:
+    # Simulate the crosstalk effect, sharing the projected charge at strip ith with neighbouring strips
+    @dispatch(ROOT.TGraphErrors)
+    def simulateCrosstalk(self, chgProfile: ROOT.TGraphErrors):
         """
-        Apply the front-end amplification to the profile of charge projected at the strips
-        
-        Paramters
-        ----------
-            chgStripWithFE (ROOT.TH1D) : profile of the charge projected at the strips with FE noise applied
-            
-        Returns
-        -------
-            lowGainVoltageProfile (ROOT.TH1D) : profile of low gain voltage projected at the strips with front-end low gain applied
-            highGainVoltageProfile (ROOT.TH1D) : profile of high gain voltage projected at the strips with front-end high gain applied
-
-        """
-        lgADCinVoltProf, hgADCinVoltProf = chgStripWithFE.Clone(), chgStripWithFE.Clone()
-
-        # Get sensor name, if upstream or downstream
-        sensor = "upstream"
-        if 'downstream' in chgStripWithFE.GetTitle(): sensor = "downstream"
-        # Set title
-        lgADCinVoltProf.SetTitle(f"Low gain ADC-input voltage {sensor} sensor")
-        hgADCinVoltProf.SetTitle(f"High gain ADC-input voltage {sensor} sensor")
-        # Set name (chgStripWithFE name is chgProjFEProfileY) is mapped into lgADCinVoltProfX or lgADCinVoltProfY
-        lgADCinVoltProf.SetName("lgADCinVoltProf"+(chgStripWithFE.GetName())[-1])
-        hgADCinVoltProf.SetName("hgADCinVoltProf"+(chgStripWithFE.GetName())[-1])
-        # Set vertical axis title
-        lgADCinVoltProf.GetYaxis().SetTitle("LG ADC-input (V)")
-        hgADCinVoltProf.GetYaxis().SetTitle("HG ADC-input (V)")
-        lgADCinVoltProf.GetXaxis().CenterTitle()
-        lgADCinVoltProf.GetYaxis().CenterTitle()
-        hgADCinVoltProf.GetXaxis().CenterTitle()
-        hgADCinVoltProf.GetYaxis().CenterTitle()
-        
-        # Convert the charge to a voltage (the histograms contains chg. in C, the pre-factor 1e9 converts the mV/pC to V/C)
-        lgADCinVoltProf.Scale(1e9*self.lGain)
-        hgADCinVoltProf.Scale(1e9*self.hGain)
-
-        # Diagnostic plots
-        if ((self.logging).level == 10):
-            view, ax = plt.subplots()
-            view.suptitle("Profile with amplification applied")
-            ax.set_xlabel("strip no.")
-            ax.set_ylabel("signal+noise [V]")
-            ax.plot(lgADCinVoltProf, label=f"low gain set value is {np.round(self.lGain,1)} mV/pC.")
-            ax.plot(hgADCinVoltProf, label=f"high gain set value is {np.round(self.hGain,1)} mV/pC.")
-            view.legend(loc="upper right")
-            view.show()
-            plt.show()
-
-
-        return (lgADCinVoltProf, hgADCinVoltProf)
-    
-    # TODO double check if the vaules sotred in .txt are correct
-    # Apply the front-end amplification to the profile of charge projected at the strips
-    def applyAmplificationPerBunch(self, chgStripWithFE: ROOT.TH1D, vRefRange: np.array) -> dict:
-        """
-        Apply the front-end amplification to the profile of charge projected at the strips for each bunch         
-        Paramters
-        ----------
-            chgStripWithFE (ROOT.TH1D) : profile of the charge projected at the strips with FE noise applied
-            vRefRange (np.array) : range of reference voltages to be applied
-            
-        Returns
-        -------
-            lowGainVoltageProfile (dict) : profile of low gain voltage projected at the strips with front-end low gain applied
-            highGainVoltageProfile (dict) : profile of high gain voltage projected at the strips with front-end high gain applied
-
-        """
-        lgADCinVoltProf, hgADCinVoltProf = chgStripWithFE.Clone(), chgStripWithFE.Clone()
-
-        # Get sensor name, if upstream or downstream
-        sensor = "upstream"
-        if 'downstream' in chgStripWithFE.GetTitle(): sensor = "downstream"
-        # Set title
-        lgADCinVoltProf.SetTitle(f"Low gain ADC-input voltage {sensor} sensor")
-        hgADCinVoltProf.SetTitle(f"High gain ADC-input voltage {sensor} sensor")
-        # Set name (chgStripWithFE name is chgProjFEProfileY) is mapped into lgADCinVoltProfX or lgADCinVoltProfY
-        lgADCinVoltProf.SetName("lgADCinVoltProf"+(chgStripWithFE.GetName())[-1])
-        hgADCinVoltProf.SetName("hgADCinVoltProf"+(chgStripWithFE.GetName())[-1])
-        # Set vertical axis title
-        lgADCinVoltProf.GetYaxis().SetTitle("LG ADC-input (V)")
-        hgADCinVoltProf.GetYaxis().SetTitle("HG ADC-input (V)")
-        lgADCinVoltProf.GetXaxis().CenterTitle()
-        lgADCinVoltProf.GetYaxis().CenterTitle()
-        hgADCinVoltProf.GetXaxis().CenterTitle()
-        hgADCinVoltProf.GetYaxis().CenterTitle()
-        
-        # Convert the charge to a voltage (the histograms contains chg. in C, the pre-factor 1e9 converts the mV/pC to V/C)
-        lgADCinVoltProf.Scale(1e9*self.lGain)
-        hgADCinVoltProf.Scale(1e9*self.hGain)
-
-        avglSigPerVref = {}
-        avghSigPerVref = {}
-
-        # Loop over the bunchID and noise values
-        for bunchID, self.vref in enumerate(vRefRange):
-            for i in range(1, lgADCinVoltProf.GetNbinsX() + 1):
-                avglSigPerVref[bunchID] = (np.mean(lgADCinVoltProf.GetBinContent(i))/self.vref, np.std(lgADCinVoltProf.GetBinContent(i))/self.vref)
-            for i in range(1, hgADCinVoltProf.GetNbinsX() + 1):
-                avghSigPerVref[bunchID] = (np.mean(hgADCinVoltProf.GetBinContent(i))/self.vref, np.std(hgADCinVoltProf.GetBinContent(i))/self.vref)
-                with open('average_signal_ADCRange.txt', 'w') as f:
-                    for bunchID, (mean, std) in avglSigPerVref.items():
-                        f.write(f'Bunch {bunchID}:  low gain signal = {mean}, error = {std}\n')
-                    for bunchID, (mean, std) in avghSigPerVref.items():
-                        f.write(f'Bunch {bunchID}:  high gain signal = {mean}, error = {std}\n')
-                    f.close()
-
-        # Diagnostic plots
-        if ((self.logging).level == 10):
-            view, ax = plt.subplots()
-            view.suptitle("Profile with amplification applied")
-            ax.set_xlabel("strip no.")
-            ax.set_ylabel("signal+noise [V]")
-            ax.plot(lgADCinVoltProf, label=f"low gain set value is {np.round(self.lGain,1)} mV/pC.")
-            ax.plot(hgADCinVoltProf, label=f"high gain set value is {np.round(self.hGain,1)} mV/pC.")
-            view.legend(loc="upper right")
-            view.show()
-            plt.show()
-
-
-        return (lgADCinVoltProf, hgADCinVoltProf)
-    
-    # Convert a profile from continuous voltage value to discrete value
-    def applyADC(self, profile: ROOT.TH1D) -> ROOT.TH1D:
-        """
-        Apply the Analog-to-digital conversion to the profiles of low and high gain voltages at the strips.
-        
-        Paramters
-        ----------
-            contiProfile (ROOT.TH1D) : input 'continuous' profile (vertical unit is supposed to be V)
-            
-        Returns
-        -------
-            discrProfile (ROOT.TH1D) : output 'discrete' profile (vertical unit is ADC values)
-        """
-        
-        # Debugging info about ADC module
-        msg = f"""Applying AD conversion with parameters:
-        adcResolution      : {self.adcResolution}-bit
-        maxADC             : {self.maxADC} 
-        vref               : {self.vref} V
-        adcScale           : {self.adcScale} V/count\n----------------"""
-        (self.logging).debug(msg)
-
-
-        # Copy the input histogram
-        out = profile.Clone()
-
-        # Set the proper names, styles etc.
-        out.SetTitle(out.GetTitle().replace("ADC-input voltage", "ADC-counts"))
-        out.GetYaxis().SetTitle(f"ADC counts [0-{self.maxADC}]")
-        out.SetName(out.GetName().replace('inVolt', 'cts'))
-        
-        # For each strip get the voltage after the amplification and convert it to ADC counts 
-        # using the adcScale, finally, the value is clipped between 0 and the maximal allowed ADC value
-        for i in range(out.GetNbinsX()):
-            val = out.GetBinContent(i)
-            newVal = np.clip(np.round(val / self.adcScale), 0, self.maxADC)
-            out.SetBinContent(i, newVal)
-        
-        # Diagnostic plots
-        if ((self.logging).level == 10):
-            view, ax = plt.subplots()
-            view.suptitle("Profile of ADC counts")
-            ax.set_xlabel("strip no.")
-            ax.set_ylabel("ADC counts")
-            ax.plot(out, label=f"ADC resolution is {self.adcResolution}-bit.")
-            view.legend(loc="upper right")
-            view.show()
-            plt.show()
-            
-        return out
-    
-    # Attach the computed errors to the histograms
-    def applyMCStatErrs(self, hist: dict, errs: dict)-> ROOT.TH1D:
-        """
-        Attach the computed errors to the histograms. The errors are computed from the MC statistics. 
-        The function takes as input a histogram and an array of errors and sets the errors of the histogram to the values in the array.
+        Simulates the cross-talk between neighbour strips. The cross talk is simulated by adding a fraction of the charge of each strip to the nearest neighbours, with a percentage depending on the distance between strip i and strip j
 
         Parameters
         ----------
-            hist (ROOT.TH1D) : input histogram
-            errs (np.array) : array of errors to be attached to the histogram
-
-        Returns
-        -------
-            hist (dict) : histogram with the errors attached
+            chgProfile (ROOT.TGraphErrors) : input profile of projected charge
         """
-        for bin in range(hist.GetNbinsX()):
-            error = errs[bin]  # errs is a 1D array, so errs[bin-1] is a scalar
-            if isinstance(error, np.ndarray) and error.size == 1:
-                error = error.item()  # Convert size-1 numpy array to scalar
-                hist.SetBinError(bin, error)
-        return hist
-    
-    
-    
-    # Simulates the cross talk between two strips of the sensors. The cross talk is simulated by adding a normal distribution centered around the selected strip number for each sensor.
-    @dispatch(ROOT.TH1D, list)
-    def simulateCrosstalk(self, chgProfile: ROOT.TH1D, chgShrNN: list) -> ROOT.TH1D:
-        """
-        Simulates the cross-talk between neighbour strips. The cross talk is simulated by adding a fraction of the charge of each strip to the nearest neighbours, with
-        a perncentage depending on the diostance between strip i and strip j
-
-        Parameters
-        ----------
-            chgProfile (ROOT.TH1D) : input histogram with the charge profile of the sensor
-            chgShrNN (list) : list of fractions of charge to share with the neighbours
-            
-        Returns
-        -------
-            chgProfileWithCrossTalk (ROOT.TH1D) : histogram with the charge profile of the sensor after the cross-talk simulation
-        """
-        stripNb = chgProfile.GetNbinsX()
+        
+        stripNb = chgProfile.GetN()
+        
         npProfile = np.zeros((stripNb,2))
-        for i in range(1, stripNb+1):
+        for i in range(stripNb):
             # Get the charge and error on it
-            stripChg = chgProfile.GetBinContent(i)
-            stripChg_err = chgProfile.GetBinError(i)
-            npProfile[i-1, 0] = stripChg
-            npProfile[i-1, 1] = stripChg_err
+            stripChg = chgProfile.GetPointY(i)
+            stripChg_err = chgProfile.GetErrorY(i)
+            npProfile[i, 0] = stripChg
+            npProfile[i, 1] = stripChg_err
 
         # Create arrays to store the crosstalk contributions and their errors
-        crosstalk_contribs = np.zeros((stripNb, len(chgShrNN)))
-        crosstalk_contribs_err = np.zeros((stripNb, len(chgShrNN)))
+        crosstalk_contribs = np.zeros((stripNb, stripNb))
+        crosstalk_contribs_err = np.zeros((stripNb, stripNb))
 
         # Calculate the crosstalk contributions
         for i in range(stripNb):
             if npProfile[i, 0] != 0:
-                for j in range(len(chgShrNN)):
-                    crosstalk_contribs[i, j] = npProfile[i, 0] * chgShrNN[j]
-                    crosstalk_contribs_err[i, j] = npProfile[i, 1] * chgShrNN[j]
+                for j in range(len(self.chgShrCrossTalkMap)):
+                    crosstalk_contribs[i, j] = npProfile[i, 0] * (self.chgShrCrossTalkMap)[j]
+                    crosstalk_contribs_err[i, j] = npProfile[i, 1] * (self.chgShrCrossTalkMap)[j]
 
         # Update the charge profile
         updatedProfile = npProfile.copy()
         #initialChg = np.sum(updatedProfile, 0)
         for i in range(stripNb):
             if npProfile[i, 0] != 0:
-                for j in range(len(chgShrNN)):
+                for j in range(stripNb):
                     # Update the charge on the left neighbor
                     if i-(j+1) >= 0:
                         updatedProfile[i-(j+1), 0] += crosstalk_contribs[i, j]
@@ -478,190 +203,155 @@ class frontend:
         #currentChg = np.sum(updatedProfile, 0)
         #updatedProfile *=  initialChg/currentChg
         
-        # Diagnostic plots
-        if ((self.logging).level == 10):
-            view, ax = plt.subplots()
-            view.suptitle("Projected charge profile before/after crosstalk charge spread")
-            ax.set_xlabel("strip no.")
-            ax.set_ylabel("strip charge [C]")
+        for i in range(stripNb):
+            chgProfile.SetPointY(i, updatedProfile[i, 0])
 
-            # Use the same 'x' data for both "before" and "after" plots
-            x_data = np.arange(1, stripNb + 1)
-
-            ax.errorbar(x_data, npProfile[:, 0], yerr=npProfile[:, 1], fmt='o', label='before crosstalk')
-            ax.errorbar(x_data, updatedProfile[:, 0], yerr=updatedProfile[:, 1], fmt='o', label='after crosstalk')
-            ax.legend(loc="upper right")
-            view.show()
-            plt.show()
-
-
-        # Create a new histogram for the updated charge profile
-        chgProfileWithCrossTalk = chgProfile.Clone()
-        chgProfileWithCrossTalk.SetName(chgProfileWithCrossTalk.GetName().replace("Proj", "ProjWithCrosstalk"))
-        chgProfileWithCrossTalk.SetTitle(chgProfileWithCrossTalk.GetTitle() + " with cross-talk applied")
-        chgProfileWithCrossTalk.GetYaxis().SetTitle(chgProfileWithCrossTalk.GetYaxis().GetTitle().replace("projected", "projected with CT"))
-        for i in range(1, stripNb+1):
-            chgProfileWithCrossTalk.SetBinContent(i, updatedProfile[i-1, 0])
-        return chgProfileWithCrossTalk
-
-    # Overload to accomodate the structure of the other functions
-    @dispatch(dict, dict, list)
-    def simulateCrosstalk(self, chgProfilesUp: dict, chgProfilesDo: dict, chgShrNN: list) -> tuple:
+    
+    # Overload of simulateCrosstalk for the array of hor./vert. bunch profiles
+    @dispatch()
+    def simulateCrosstalk(self):
+        for entry in self.projChgProfiles:
+            self.simulateCrosstalk(entry['d0_x'])
+            self.simulateCrosstalk(entry['d1_y'])
+    
+    
+    # Simulate the charge amplification, effectively by rescaling the input profile by the gain factor
+    @dispatch(ROOT.TGraphErrors)
+    def applyAmplification(self, chgStripWithFE: ROOT.TGraphErrors):
         """
-        Returns the tuple with the dictionaries chgProfilesUp and chgProfilesDo with the new 'chgProjWithCTProfile' key
-        containing the profiles with the strip cross-talk effect applied
+        Simulate the charge amplification, effectively by rescaling the input profile by the gain factor
         
-        Parameters
+        Paramters
         ----------
-            chgProfilesUp (dict) : dictionary with the charge profiles of the upstream sensor
-            chgProfilesDo (dict) : dictionary with the charge profiles of the downstream sensor
-            chgShrNN (list) : list of fractions of charge to share with the neighbours
+            chgStripWithFE (ROOT.TGraphErrors) : profile of the charge projected at the strips with FE noise applied
             
-        Returns
-        -------
-            (chgProfilesUp, chgProfilesDo) (tuple) : tuple with the dictionaries chgProfilesUp and chgProfilesDo with the new 'chgProjWithCTProfile' key
         """
-        chgProjWithCTProfileUp_X = self.simulateCrosstalk(chgProfilesUp['chgProjProfile'][0], chgShrNN)
-        chgProjWithCTProfileUp_Y = self.simulateCrosstalk(chgProfilesUp['chgProjProfile'][1], chgShrNN)
-        chgProfilesUp['chgProjWithCTProfile'] = (chgProjWithCTProfileUp_X, chgProjWithCTProfileUp_Y)
         
-        chgProjWithCTProfileDo_X = self.simulateCrosstalk(chgProfilesUp['chgProjProfile'][0], chgShrNN)
-        chgProjWithCTProfileDo_Y = self.simulateCrosstalk(chgProfilesUp['chgProjProfile'][1], chgShrNN)
-        chgProfilesDo['chgProjWithCTProfile'] = (chgProjWithCTProfileDo_X, chgProjWithCTProfileDo_Y)
+        ## Get sensor name, if upstream or downstream
+        #sensor = "upstream"
+        #if 'downstream' in chgStripWithFE.GetTitle(): sensor = "downstream"
+        ## Set title
+        #chgStripWithFE.SetTitle(f"Low gain ADC-input voltage {sensor} sensor")
+        #hgADCinVoltProf.SetTitle(f"High gain ADC-input voltage {sensor} sensor")
+        ## Set name (chgStripWithFE name is chgProjFEProfileY) is mapped into lgADCinVoltProfX or lgADCinVoltProfY
+        #chgStripWithFE.SetName("lgADCinVoltProf"+(chgStripWithFE.GetName())[-1])
+        #hgADCinVoltProf.SetName("hgADCinVoltProf"+(chgStripWithFE.GetName())[-1])
+        ## Set vertical axis title
+        #chgStripWithFE.GetYaxis().SetTitle("LG ADC-input (V)")
+        #hgADCinVoltProf.GetYaxis().SetTitle("HG ADC-input (V)")
+        #chgStripWithFE.GetXaxis().CenterTitle()
+        #chgStripWithFE.GetYaxis().CenterTitle()
+        #hgADCinVoltProf.GetXaxis().CenterTitle()
+        #hgADCinVoltProf.GetYaxis().CenterTitle()
         
-        return (chgProfilesUp, chgProfilesDo)
+        # Convert the charge to a voltage (the histograms contains chg. in C, the pre-factor 1e9 converts the mV/pC to V/C)
+        chgStripWithFE.Scale(self.fGain)
+
+        ## Diagnostic plots
+        #if ((self.logging).level == 10):
+        #    view, ax = plt.subplots()
+        #    view.suptitle("Profile with amplification applied")
+        #    ax.set_xlabel("strip no.")
+        #    ax.set_ylabel("signal+noise [V]")
+        #    ax.plot(chgStripWithFE, label=f"low gain set value is {np.round(self.lGain,1)} mV/pC.")
+        #    ax.plot(hgADCinVoltProf, label=f"high gain set value is {np.round(self.hGain,1)} mV/pC.")
+        #    view.legend(loc="upper right")
+        #    view.show()
+        #    plt.show()
     
     
+    # Overload for apply amplification for the projChgProfiles array 
+    @dispatch()
+    def applyAmplification(self):
+        for entry in self.projChgProfiles:
+            self.applyAmplification(entry['d0_x'])
+            self.applyAmplification(entry['d1_y'])
     
-          
-    def digitizeRun(self, fname = "gammaRun_1M.root", bunchPartNb=100000)-> tuple:
+    
+     # Simulates the cross talk between two strips of the sensors. The cross talk is simulated by adding a normal distribution centered around the selected strip number for each sensor.
+    
+
+    # Simulate the ADC conversion by discretizing the input profile with a step function
+    @dispatch(ROOT.TGraphErrors)
+    def applyADC(self, chgStripAmp: ROOT.TGraphErrors):
         """
-        Description
-        -----------
-        This function performs the digitization of the energy deposition maps. It takes as input the ROOT file with the energy deposition maps and returns a dictionary with the digitized histograms.
-
-        Pipeline
-        1. readEdepFromROOT - read the energy deposition from the ROOT file and store it in a dictionary
-        2. computeError_v2 - compute the error on the charge profiles
-        3. applyMCStatErrs - apply the errors to the histograms
-        4. getChgProfiles - get the charge profiles from the energy deposition maps 
-        5. applyFENoise - apply the front-end noise to the profile of charge collected at the strips
-        6. applyAmplification - apply the front-end amplification to the profile of charge projected at the strips to get the input voltage
-        7. applyADC - convert a voltage profile to a discrete ADC counts profile
-        8. mapStripProfile - change labels to have strip numbers in the horizontal axis (instead of X/Y in mm)
-        9. mapAllHistograms - map all histograms in the given dictionary using mapStripProfile
-        10. dumpAllInRoot - dump all the objects in the args to the ROOT file with filename 'fname'
-        11. simulateCrossTalk - simulate the cross talk effect between strips
-        12. createTH1F - create a histogram for the stats
-        13. createTGraph - create a TGraph
-
-        Parameters
+        Simulate the ADC conversion by discretizing the input profile with a step function
+        
+        Paramters
         ----------
-            fname (str) : name of the ROOT file with the energy deposition maps
-            bunchPartNb (int) : number of particles in the bunch
-
-        Returns
-        -------
-            tuple : tuple of the digitized histograms
+            chgStripAmp (ROOT.TGraphErrors) : input profile
         """
-
-
-        ## TODO Incorporate the computeError_v2 into the readEdepFromROOT(str, int) and applyMCStatErrs in getChgProfiles
         
+        ## Debugging info about ADC module
+        #msg = f"""Applying AD conversion with parameters:
+        #adcResolution      : {self.iADCres}-bit
+        #maxADC             : {self.maxADC}
+        #adcScale           : {self.adcScale} V/count\n----------------"""
+        #(self.logging).debug(msg)
+
+        ## Set the proper names, styles etc.
+        #chgStripAmp.SetTitle(chgStripAmp.GetTitle().replace("ADC-input voltage", "ADC-counts"))
+        #chgStripAmp.GetYaxis().SetTitle(f"ADC counts [0-{self.maxADC}]")
+        #chgStripAmp.SetName(chgStripAmp.GetName().replace('inVolt', 'cts'))
         
-        # Read the energy deposition from the ROOT file and store it in a dictionary
-        bunchesData = readEdepFromROOT(fname, bunchPartNb)
-        
-        # Create dictionaries to store data for each bunch
-        bunchIDs = []
-        lgADCctsMeanUp = []
-        lgADCctsStdDevUp = []
-        hgADCctsMeanUp = [] 
-        hgADCctsStdDevUp = []
-        lgADCctsMeanDo = []
-        lgADCctsStdDevDo = []
-        hgADCctsMeanDo = [] 
-        hgADCctsStdDevDo = []
-
-        # Compute the error on the charge profiles
-        bunchesData_err = calculateProfileStatErrs(bunchesData)
-        
-        for bunchID, bunch_data in bunchesData.items():
-            # Extract data from dictionary 
-            edepMapUp = bunch_data[f"b{bunchID}_edepMapUp"]
-            edepMapDo = bunch_data[f"b{bunchID}_edepMapDo"]
-
-            # Get the profiles of charge deposited and projected
-            chgProfilesUp, chgProfilesDo = getChgDepProjProfiles(edepMapUp), getChgDepProjProfiles(edepMapDo)
-        
-            # Attach the errors to the histograms
-            for dir in [0,1]:
-                self.applyMCStatErrs(chgProfilesUp['chgProjProfile'][dir], bunchesData_err[0, dir, :])
-                self.applyMCStatErrs(chgProfilesDo['chgProjProfile'][dir], bunchesData_err[1, dir, :])
-
-
-            # Apply strip cross-talk to the charge profiles
-            #global _debug
-            #_debug = True
-            chgProfilesWithCT = self.simulateCrosstalk(chgProfilesUp, chgProfilesDo, self.chgShrCrossTalkMap)
-
-
-
-            noise_range = np.linspace(51, 92, 10)
-            # Apply the front-end noise to the profile of charge collected at the strips
-            fEHistUp, fEHistDo = self.applyFENoise(chgProfilesUp['chgProjProfile'][0], noise_range, True), self.applyFENoise(chgProfilesDo['chgProjProfile'][1], noise_range, True)
-
-            vRefRange = np.linspace(0.057, 0.504, 10)
-            # Apply the front-end amplification to the profile of charge projected at the strips,
-            lgHistUp, hgHistUp = self.applyAmplificationPerBunch(fEHistUp, vRefRange);  lgHistDo, hgHistDo = self.applyAmplificationPerBunch(fEHistDo, vRefRange)
-            # Convert a profile from continuous voltage value to discrete value
-            lgADCHistUp, hgADCHistUp = self.applyADC(lgHistUp), self.applyADC(hgHistUp); lgADCHistDo, hgADCHistDo = self.applyADC(lgHistDo), self.applyADC(hgHistDo)
-
+        for i in range(chgStripAmp.GetN()):
+            # Get charge
+            chg = chgStripAmp.GetPointY(i)
+            chg_err = chgStripAmp.GetErrorY(i)
             
-            canvas1 = ROOT.TCanvas("canvas1", "getChgProfiles deposited")
-            chgProfilesUp['chgDepProfile'][0].Draw("e1x0")
+            # Discretization
+            if chg < 0:
+                adcCounts = 0
+                adccounts_err = 0
+            elif chg >= self.fOlScale:
+                adcCounts = self.maxADC
+                adccounts_err = 0
+            else:
+                adcCounts = np.intc((chg/self.fOlScale) * self.maxADC)
+                adccounts_err = np.intc(chg_err * self.maxADC/self.fOlScale)
+            
+            # Set digitized charge
+            chgStripAmp.SetPointY(i, adcCounts)
+            chgStripAmp.SetPointError(i, 1.4433757e-05, adccounts_err)
 
 
-            canvas2 = ROOT.TCanvas("canvas2", "getChgProfiles projected")
-            chgProfilesUp['chgProjProfile'][0].Draw("e1x0")
-            
-            
-            canvas3 = ROOT.TCanvas("canvas3", "simulateCrossTalk")
-            chgProfilesUp['chgProjWithCTProfile'][0].Draw("e1x0")
-            
-            
-            canvas4 = ROOT.TCanvas("canvas4", "applyFENoisePerBunch")
-            fEHistUp.Draw("e1x0")
-            
-            canvas5 = ROOT.TCanvas("canvas5", "applyAmplification")
-            canvas5.Divide(2)
-            lgHistUp.Draw("e1x0")
-            canvas5.cd(2)
-            lgADCHistUp.Draw("e1x0")
-            
-            input()
-            exit()
-            #observables = self.computeOnDigizedProfiles(lgADCHistUp, hgADCHistUp)
-            
-            #roFileClass.OPT_fill(bunch = 0, evt = 2, det=0, dir=0, optPar=np.array([0,1,2]), optParErr = np.array([0,1,2]))
-            # Call the class to store these observables on the root file
-            
-
-            # Calculate stats
-            bunchIDs.append(bunchID)
-            # For upstream histograms
-            lgADCctsMeanUp.append(mapStripProfile(lgADCHistUp).GetMean())
-            lgADCctsStdDevUp.append(mapStripProfile(lgADCHistUp).GetStdDev())
-            hgADCctsMeanUp.append(mapStripProfile(hgADCHistUp).GetMean())
-            hgADCctsStdDevUp.append(mapStripProfile(hgADCHistUp).GetStdDev())
-            # For downstream histograms
-            lgADCctsMeanDo.append(mapStripProfile(lgADCHistDo).GetMean())
-            lgADCctsStdDevDo.append(mapStripProfile(lgADCHistDo).GetStdDev())
-            hgADCctsMeanDo.append(mapStripProfile(hgADCHistDo).GetMean())
-            hgADCctsStdDevDo.append(mapStripProfile(hgADCHistDo).GetStdDev())
-
-        return (edepMapUp, edepMapDo, chgProfilesUp, chgProfilesDo, lgHistUp, lgHistDo, hgHistUp, hgHistDo, fEHistUp, fEHistDo, lgADCHistUp, lgADCHistDo, hgADCHistUp, hgADCHistDo, bunchIDs, lgADCctsMeanUp, lgADCctsStdDevUp, hgADCctsMeanUp, hgADCctsStdDevUp, lgADCctsMeanDo, lgADCctsStdDevDo, hgADCctsMeanDo, hgADCctsStdDevDo)
+        ## Diagnostic plots
+        #if ((self.logging).level == 10):
+        #    view, ax = plt.subplots()
+        #    view.suptitle("Profile of ADC counts")
+        #    ax.set_xlabel("strip no.")
+        #    ax.set_ylabel("ADC counts")
+        #    ax.plot(chgStripAmp, label=f"ADC resolution is {self.adcResolution}-bit.")
+        #    view.legend(loc="upper right")
+        #    view.show()
+        #    plt.show()
 
 
-    def computeOnDigizedProfiles(a, b):
-        pass
+    # Overload for apply amplification for the projChgProfiles array 
+    @dispatch()
+    def applyADC(self):
+        for entry in self.projChgProfiles:
+            self.applyADC(entry['d0_x'])
+            self.applyADC(entry['d1_y'])
+    
+    
+    # Apply the entire pipeline of the frontend class
+    @dispatch(ROOT.TGraphErrors)
+    def doPipeline(self, profile: ROOT.TGraphErrors):
+        self.applyNoise(profile)
+        self.simulateCrosstalk(profile)
+        self.applyAmplification(profile)
+        self.applyADC(profile)
+   
+   
+    # Overload of doPipeline for the projChgProfiles array
+    @dispatch()
+    def doPipeline(self):
+        for entry in self.projChgProfiles:
+            self.doPipeline(entry['d0_x'])
+            self.doPipeline(entry['d1_y'])
+   
+    
+    # Return the array of digitized profiles
+    def getDigitizedProfiles(self) -> np.array:
+        return (self.projChgProfiles)
