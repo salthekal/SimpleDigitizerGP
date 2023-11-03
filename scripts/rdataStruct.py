@@ -43,7 +43,7 @@ class rdataStruct_OPT():
         self.OPT_iADCres = np.array([0], dtype=np.uint32)
         self.OPT_fOlScale = np.array([0], dtype=np.double)
         self.OPT_fGain = np.array([0], dtype=np.double)
-        self.OPT_vChgShrCrossTalkMap = np.array([0], dtype=np.double)
+        self.OPT_vChgShrCrossTalkMap = np.zeros(10, dtype=np.double)
         #self.OPT_vparName = np.array([0,0], dtype=np.str_)
         #self.OPT_vparValue = np.array([0,0], dtype=np.double)
         #self.OPT_vparErr  = np.array([0,0], dtype=np.double)
@@ -60,33 +60,34 @@ class rdataStruct_OPT():
         self.OPT_vfSA_bck_err = np.array([0, 0], dtype=np.double)
 
         self.OPT_nametypes = [
-            ("bunch",                   self.OPT_ibunch,                "bunch/i",              "Bunch number"),
-            ("evt",                     self.OPT_ievt,                  "evt/i",                "Event number"),
-            ("det",                     self.OPT_vdet,                  "det[2]/i",             "Detector ID [0-1]"),          
-            ('bunchParNb',              self.OPT_ibunchParNb,           "bunchParNb/i",         "Number of particles in a bunch"),
-            ('cce',                     self.OPT_fcce,                  "cce/D",                "Charge collection efficiency [0-1]"),
-            ('avgPairEn',               self.OPT_favgPairEn,            "avgPairEn/D",          "Average pair creation energy [eV]"),
-            ('fNoise',                  self.OPT_fNoise,                "fNoise/D",             "Frontend noise [in electrons]"),
-            ('iADCres',                 self.OPT_iADCres,               "iADCres/i",            "Number of bits of the ADC"),
-            ('fOlScale',                self.OPT_fOlScale,              "fOlScale/D",           "Fullscale range of the ADC [in electrons]"),
-            ('fGain',                   self.OPT_fGain,                 "fGain/D",              "Gain (i.e., the ration between the amplified charge and the projected charge)"),
-            ('vChgShrCrossTalkMap',     self.OPT_vChgShrCrossTalkMap,   "std::vector<double>",  "Strip cross talk vector"),
+            ("bunch",                   self.OPT_ibunch,                "bunch/i",                      "Bunch number"),
+            ("evt",                     self.OPT_ievt,                  "evt/i",                        "Event number"),
+            ("det",                     self.OPT_vdet,                  "det[2]/i",                     "Detector ID [0-1]"),          
+            #       
+            ('bunchParNb',              self.OPT_ibunchParNb,           "bunchParNb/i",                 "Number of particles in a bunch"),
+            ('cce',                     self.OPT_fcce,                  "cce/D",                        "Charge collection efficiency [0-1]"),
+            ('avgPairEn',               self.OPT_favgPairEn,            "avgPairEn/D",                  "Average pair creation energy [eV]"),
+            ('fNoise',                  self.OPT_fNoise,                "fNoise/D",                     "Frontend noise [in electrons]"),
+            ('iADCres',                 self.OPT_iADCres,               "iADCres/i",                    "Number of bits of the ADC"),
+            ('fOlScale',                self.OPT_fOlScale,              "fOlScale/D",                   "Fullscale range of the ADC [in electrons]"),
+            ('fGain',                   self.OPT_fGain,                 "fGain/D",                      "Gain (i.e., the ration between the amplified charge and the projected charge)"),
+            ('vChgShrCrossTalkMap',     self.OPT_vChgShrCrossTalkMap,   "vChgShrCrossTalkMap[10]/D",    "Strip cross talk vector"),
             #
             #("parName",                 self.OPT_vparName,      "std::vector<string>",   "Fit parameter name"),
             #("parValue",                self.OPT_vparValue,     "std::vector<double>",   "Fit parameter value"),
             #("parErr",                  self.OPT_vparErr,       "std::vector<double>",   "Fit parameter error"),
             #
-            ("chi2",                    self.OPT_vchi2,          "chi2[2]/D",            "Chi square"),
-            ("ndf",                     self.OPT_vndf,           "ndf[2]/D",             "Number of degrees of freedom"),
-            ("rchi2",                   self.OPT_vrchi2,         "rchi2[2]/D",           "Reduced chisquare (chi2/ndf)"),
-            ("fSA_amp",                 self.OPT_vfSA_amp,       "fSA_amp[2]/D",         "Fit scheme A - amplitude"),
-            ("fSA_mea",                 self.OPT_vfSA_mea,       "fSA_mea[2]/D",         "Fit scheme A - mean value"),
-            ("fSA_sig",                 self.OPT_vfSA_sig,       "fSA_sig[2]/D",         "Fit scheme A - sigma"),
-            ("fSA_bck",                 self.OPT_vfSA_bck,       "fSA_bck[2]/D",         "Fit scheme A - background value"),
-            ("fSA_amp_err",             self.OPT_vfSA_amp_err,   "fSA_amp_err[2]/D",     "Fit scheme A - Error on the amplitude"),
-            ("fSA_mea_err",             self.OPT_vfSA_mea_err,   "fSA_mea_err[2]/D",     "Fit scheme A - Error on the mean value"),
-            ("fSA_sig_err",             self.OPT_vfSA_sig_err,   "fSA_sig_err[2]/D",     "Fit scheme A - Error on the sigma"),
-            ("fSA_bck_err",             self.OPT_vfSA_bck_err,   "fSA_bck_err[2]/D",     "Fit scheme A - Error on the background value"),
+            ("chi2",                    self.OPT_vchi2,          "chi2[2]/D",                           "Chi square"),
+            ("ndf",                     self.OPT_vndf,           "ndf[2]/D",                            "Number of degrees of freedom"),
+            ("rchi2",                   self.OPT_vrchi2,         "rchi2[2]/D",                          "Reduced chisquare (chi2/ndf)"),
+            ("fSA_amp",                 self.OPT_vfSA_amp,       "fSA_amp[2]/D",                        "Fit scheme A - amplitude"),
+            ("fSA_mea",                 self.OPT_vfSA_mea,       "fSA_mea[2]/D",                        "Fit scheme A - mean value"),
+            ("fSA_sig",                 self.OPT_vfSA_sig,       "fSA_sig[2]/D",                        "Fit scheme A - sigma"),
+            ("fSA_bck",                 self.OPT_vfSA_bck,       "fSA_bck[2]/D",                        "Fit scheme A - background value"),
+            ("fSA_amp_err",             self.OPT_vfSA_amp_err,   "fSA_amp_err[2]/D",                    "Fit scheme A - Error on the amplitude"),
+            ("fSA_mea_err",             self.OPT_vfSA_mea_err,   "fSA_mea_err[2]/D",                    "Fit scheme A - Error on the mean value"),
+            ("fSA_sig_err",             self.OPT_vfSA_sig_err,   "fSA_sig_err[2]/D",                    "Fit scheme A - Error on the sigma"),
+            ("fSA_bck_err",             self.OPT_vfSA_bck_err,   "fSA_bck_err[2]/D",                    "Fit scheme A - Error on the background value"),
         ]
         self.OPT_fill_warnings = {item[0]:False for item in self.OPT_nametypes}  
         ######################################################

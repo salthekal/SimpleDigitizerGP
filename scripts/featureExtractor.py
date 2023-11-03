@@ -171,6 +171,8 @@ class featureExtractor:
             data['evt'] = i
             data['det'] = np.array([0,1], dtype=np.uint32)
             
+            data.update(self.dgtPars)
+            
             data['chi2'] = np.array([entry['d0_fitSchemeA']['chi2'], entry['d1_fitSchemeA']['chi2']])
             data['ndf'] = np.array([entry['d0_fitSchemeA']['ndf'], entry['d1_fitSchemeA']['ndf']])
             data['rchi2'] = np.array([entry['d0_fitSchemeA']['rchi2'], entry['d1_fitSchemeA']['rchi2']])

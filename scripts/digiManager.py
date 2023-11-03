@@ -54,6 +54,8 @@ def calculateStripNb(pos_mm: float, stripPitch_mm: float, nbStrips: int) -> int:
     return int( (pos_mm + stripPitch_mm*nbStrips/2.0) / (stripPitch_mm*nbStrips) * nbStrips + 1.0 )
 
 
+
+
 @dispatch(str, str, int, float, float, float, int, float, float, list)
 def pipeline(mcPath: str, outPath: str, _bunchParNb: int, _cce: float, _avgPairEn: float, _fNoise: float, _iADCres: int, _fOlScale: float, _fGain: float, _vChgShrCrossTalkMap: list):
     """
@@ -86,7 +88,7 @@ def pipeline(mcPath: str, outPath: str, _bunchParNb: int, _cce: float, _avgPairE
         "iADCres" : _iADCres,
         "fOlScale" : _fOlScale,
         "fGain" : _fGain,
-        "vChgShrCrossTalkMap" : _vChgShrCrossTalkMap
+        "vChgShrCrossTalkMap" : np.array(_vChgShrCrossTalkMap + [0]*(10-len(_vChgShrCrossTalkMap)))
     }
     
     # Read data from the MC
@@ -125,6 +127,7 @@ def pipeline():
     9. _fGain = 1.0,
     10. _vChgShrCrossTalkMap = [0]
     """
+    
     pipeline(
         "build/dummyRun_100k.root",
         "testFeatureExtractor.root",
@@ -135,28 +138,69 @@ def pipeline():
         8, 
         (10e-15/1.60e-19),
         1.0,
-        [0])
+        [0.1,0.01,0.001])
 
 
 
+# Generate a parameter space. The idea of this function is to optimize the phase space w.r.t. the naive linspace tensor product
+def makePhaseSpace(cce: tuple, avgPairEn: tuple, fNoise: tuple, iADCres: tuple, fOlScale: tuple, fGain: tuple, vChgShrCrossTalkMap: tuple) -> np.array:
+    """
+    Expand the input tuples and generate the phase space to sample with the simulation
+    
+    Parameters
+    ----------
+        cce (tuple) : Range for the cce in the form (cceStart, cceEnd, Nppoints). (It includes the endpoint)
+        avgPairEn (tuple) : Range for the avgPairEn in the form (avgPairEnStart, avgPairEnEnd, Nppoints). (It includes the endpoint)
+        fNoise (tuple) : Range for the fNoise in the form (fNoiseStart, fNoiseEnd, Nppoints). (It includes the endpoint)
+        iADCres (tuple) : Range for the iADCres in the form (iADCresStart, iADCresEnd, Nppoints). (It includes the endpoint)
+        fOlScale (tuple) : Range for the fOlScale in the form (fOlScaleStart, fOlScaleEnd, Nppoints). (It includes the endpoint)
+        fGain (tuple) : Range for the fGain in the form (fGainStart, fGainEnd, Nppoints). (It includes the endpoint)
+        vChgShrCrossTalkMap (tuple) : Range for the vChgShrCrossTalkMap in the form (vChgShrCrossTalkMapStart, vChgShrCrossTalkMapEnd, Nppoints). (It includes the endpoint)
+    
+    Returns
+    -------
+        phaseSpace (np.array) : stack with the phase space linstack
+    """
+    
+    # Expand the input tuples
+    cceA, cceB, cceN = cce
+    avgPairEnA, avgPairEnB, avgPairEnN = avgPairEn
+    fNoiseA, fNoiseB, fNoiseN = fNoise
+    iADCresA, iADCresB, iADCresN = iADCres
+    fOlScaleA, fOlScaleB, fOlScaleN = fOlScale
+    fGainA, fGainB, fGainN = fGain
+    vChgShrCrossTalkMapA, vChgShrCrossTalkMapB, vChgShrCrossTalkMapN = vChgShrCrossTalkMap
+    
+    # Throw exception if the parameters are unallowed
+    if len(vChgShrCrossTalkMapA)!=len(vChgShrCrossTalkMapB):
+        logging.critical(f"The length of vChgShrCrossTalkMapA and vChgShrCrossTalkMapB should be equal. Instead you have used {vChgShrCrossTalkMapA} and {vChgShrCrossTalkMapB} with length {len(vChgShrCrossTalkMapA)} and {len(vChgShrCrossTalkMapB)}, respectively.")
+        raise Exception("Invalid vChgShrCrossTalkMapA or vChgShrCrossTalkMapB (len).")
+    
+    # Throw some warnings if the picked phase space is idiotic
+    
+    # Generate the linear spaces in a sensible way
+    phaseSpace_cce = np.linspace(cceA, cceB, cceN, endpoint=True)
+    phaseSpace_avgPairEn = np.linspace(avgPairEnA, avgPairEnB, avgPairEnN, endpoint=True)
+    phaseSpace_fNoise = np.linspace(fNoiseA, fNoiseB, fNoiseN, endpoint=True)
+    phaseSpace_iADCres = np.linspace(iADCresA, iADCresB, iADCresN, endpoint=True)
+    phaseSpace_fOlScale = np.linspace(fOlScaleA, fOlScaleB, fOlScaleN, endpoint=True)
+    phaseSpace_fGain = np.linspace(fGainA, fGainB, fGainN, endpoint=True)
+    phaseSpace_vChgShrCrossTalkMap = np.linspace(vChgShrCrossTalkMapA, vChgShrCrossTalkMapB, vChgShrCrossTalkMapN, endpoint=True)
+    
+    return np.stack(phaseSpace_cce, phaseSpace_avgPairEn, phaseSpace_fNoise, phaseSpace_iADCres, phaseSpace_fOlScale, phaseSpace_fGain, phaseSpace_vChgShrCrossTalkMap)
+    
+    
 
+
+def makeJobs():
+    pass
 
 
 
 if __name__=="__main__":
     #logging.setLevel(10)       # This correspond to debug mode
-    
     pipeline()
     exit()
-     
-    # Canvas to plot the digitized profile
-    canvas1 = ROOT.TCanvas("canvas1", "canvas1")
-    projChgProfs[0]['d0_x'].Draw("AP")
-    canvas1.Update()
     
-    canvas2 = ROOT.TCanvas("canvas2", "canvas2")
-    aFrontEnd.projChgProfiles[0]['d0_x'].Draw("AP")
-    canvas2.Update()
-    input()
-    exit()
-        
+
+# CLI parser
