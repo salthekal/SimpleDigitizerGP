@@ -161,13 +161,13 @@ class readFromMc():
 
 
     # Takes as input data the result of readEdepFromROOT and calculates the uncertainty to attach on each stripfor all the bunches in the run.
-    def calculateProfileStatErrs(self, bunchData: dict) -> dict:
+    def calculateProfileStatErrs(self, bunchData: list) -> dict:
         """
         Takes as input data the result of readEdepFromROOT and calculates the uncertainty to attach on each strip for all the bunches in the run.
         
         Parameters
         ----------
-            bunchData (dict) : dictionary containing the data of each bunch
+            bunchData (list) : list of dictionary containing the data of each bunch
 
         
         Returns
@@ -183,7 +183,7 @@ class readFromMc():
         # Store the profiles in a numpy array
         npChgDepProfile = np.zeros((bunchesNb, 2, 2, 200))         # bunch, det, direction, strip
         
-        for bunch in tqdm(bunchData, desc="Calculating errors"):
+        for bunch in tqdm(range(bunchesNb), desc="Calculating errors"):
             # Get the bunch edep 2D Map
             _edepMapUp, _edepMapDo = bunchData[bunch][f"b{bunch}_edepMapUp"], bunchData[bunch][f"b{bunch}_edepMapDo"]
 
@@ -295,7 +295,7 @@ class readFromMc():
         return result_np
 
 
-    # Overload of readEdepFromROOT to default the pdg to gamma
+    # Overload of readEdepFromROOT to avoid selection by pdg number (which is useless in this context)
     @dispatch(int)
     def readEdepFromROOT(self, bunchParNb: int) -> list:
         """
@@ -318,7 +318,7 @@ class readFromMc():
             try:
                 # produces something like dummyRun_100k.root -> dummyRun_100k_10_22.npy if 10 is bunchNb and 22 is pdg   
                 result = np.load(bunchDumpFname, allow_pickle=True)
-                return result[0]
+                return result
             except Exception as e:
                 (self.logging).error(f"Loading failed due to {e}")
         
@@ -423,12 +423,15 @@ class readFromMc():
         # bunchEMaps is a list like [obj1, obj2, ..., objN ] with N the number of bunches and objI made like
         # this objI = { f"b{i}_edepMapUp": bunch_edepMapUp, f"b{i}_edepMapDo": bunch_edepMapDo }
         
+        # Number of bunches
+        bunchesNb = len(bunchEMaps)
+        
         # Calculate the statistical error to be attached to each strip
         npChgDepProfile_err = self.calculateProfileStatErrs(bunchEMaps)
         
         # Attach the errors to the profiles
         depProjProfsBunch = []
-        for bunch in tqdm(bunchEMaps, desc="ProjGraphs with err"):
+        for bunch in tqdm(range(bunchesNb), desc="ProjGraphs with err"):
             # Get the bunch edep 2D Map
             _edepMapUp, _edepMapDo = bunchEMaps[bunch][f"b{bunch}_edepMapUp"], bunchEMaps[bunch][f"b{bunch}_edepMapDo"]
             
