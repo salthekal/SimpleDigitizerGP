@@ -9,6 +9,8 @@
 #################################################################################################
 from multipledispatch import dispatch
 from matplotlib import pyplot as plt
+from sys import argv as CLIargs
+from inspect import signature
 from tqdm import tqdm
 import numpy as np
 import ROOT
@@ -198,9 +200,132 @@ def makeJobs():
 
 
 if __name__=="__main__":
+    pass
     #logging.setLevel(10)       # This correspond to debug mode
-    pipeline()
-    exit()
+    #pipeline()
+    #exit()
     
 
-# CLI parser
+
+
+
+
+########################################################################################################################
+########################################################################################################################
+# Documentation
+def printHelp():
+    """
+    Print the CLI documentation
+    """
+    # Take a copy of the list of symbols defined in the global scope
+    globalSymbols = dict(globals())
+    
+    print("Usage: python digiManager.py <function_name> <arg1> <arg2> ...")
+    print("Available functions are: ")
+    count = 1
+    for symbolName in globalSymbols:
+        if symbolName == "printHelp": continue
+        # Check if the symbol is a callable
+        if callable(globals()[symbolName]):
+            if count > 4: print(f"\t{count-4}. {symbolName}")
+            count += 1
+
+##############################
+# Handle CLI arguments
+if len(CLIargs) < 2:
+    # Documentation
+    printHelp()
+else:
+    # Take the list of symbols defined in the global scope
+    globalSymbols = globals()
+
+    # Parse the first argument
+    callableName = CLIargs[1]
+    if (callableName not in globalSymbols):
+        logging.error(f"Symbol {callableName} not found in the global scope")
+        printHelp()
+        exit(-1)
+    elif not callable(globals()[callableName]):
+        logging.error(f"Symbol {callableName} in globals but not a callable")
+        printHelp()
+        exit(-1)
+    
+    
+    # Get the function object
+    function_to_call = globals()[callableName]
+    
+    def get_signatures(dispatched_function):
+        """
+        Get the list of signatures for the dispatched function. Generalization of the signature function for the multidispatch
+        """
+        # Get the Signature of the callable and the input parameters
+        function_signature = signature(dispatched_function)
+        
+        if (f"{function_signature}" == "(*args, **kwargs)"):
+            # dispatch
+            signatures = [entry[0] for entry in dispatched_function.funcs.items()]
+        else:
+            signatures = [entry[1].annotation for entry in function_signature.parameters.items()]
+            signatures = list([tuple(signatures)])
+        return signatures
+    
+    
+    # Get the Signature of the callable and the input parameters and extract the names and types of parameters
+    param_info = get_signatures(function_to_call)
+    
+    # Extract the function arguments from the command line
+    args_from_cli = CLIargs[2:]
+    
+    # Check if the number of arguments matches the number of parameters
+    argNbs_NotMatching = True
+    for entry in param_info:
+        if len(entry) == len(args_from_cli):
+            argNbs_NotMatching = False
+            break
+    if argNbs_NotMatching:
+        logging.error("Number of arguments does not match the function signature.")
+        print(param_info)
+        exit(-1)
+
+
+    # Attempt to convert arguments to the expected types
+    ## Generalization for multipledispatch
+    argConvertedFail = True
+    for par_types in param_info:
+        toCastParNb = 0
+        converted_args = []
+        for argI, par_type in enumerate(par_types):
+            #logging.debug(par_type, argI, args_from_cli[argI])
+            try:
+                if args_from_cli[argI].isdecimal() and par_type is str: continue
+                if (args_from_cli[argI].replace('.', '').isdecimal()) and par_type in [float, np.double, np.single]: continue
+                castedPar = par_type(args_from_cli[argI])
+                converted_args.append(castedPar)
+                toCastParNb += 1
+            except:
+                #logging.debug(f"Failed to convert {args_from_cli[argI]} to {par_type}. breaking to next set of args")
+                break
+        if len(converted_args) == len(args_from_cli):
+            argConvertedFail = False
+            break        
+    if argConvertedFail:
+        logging.error("Unable to convert the arguments to any of the expected types.")
+        exit(-1)
+        
+
+    # Info message
+    msg = f"Running: {callableName} with arguments "
+    for arg in converted_args: msg += f"{arg} "
+    msg = msg[:-1]
+    logging.info(msg)
+    
+    # Call the function with the converted arguments
+    function_to_call(*converted_args)
+    
+    # Goodbye
+    msg = ["Whatever happens, happens. - Spike Spiegel", "Everything has a beginning and an end. - Jet Black" , "They say hunger is the best spice. - Spike Spiegel", "That's what she said. - M. Scott"]
+    from random import choice
+    logging.status(choice(msg)+". Goodbye :) \n")
+
+########################################################################################################################
+########################################################################################################################
