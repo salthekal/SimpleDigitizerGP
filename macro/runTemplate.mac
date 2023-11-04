@@ -1,0 +1,29 @@
+#######################################################
+# Set filename of the output ROOT file
+#######################################################
+/analysis/setFileName dummyRun_100k.root 
+
+
+#######################################################
+# Geant4 initialization
+#######################################################
+/run/initialize
+
+#######################################################
+# Selection of particle source
+#######################################################
+/gun/particle gamma
+/gun/momentum 0 0 1.0 GeV
+/gun/energy 1 GeV
+
+# Gaussian particle gun (implemented by Salman)
+/gun/gaussian/PosX0 1.0 mm
+/gun/gaussian/PosY0 1.0 mm
+/gun/gaussian/PosZ0 -110.0 mm
+/gun/gaussian/SigmaX 2 mm
+/gun/gaussian/SigmaY 2 mm
+/gun/gaussian/setDirection 0.0 0.0 1.0 
+
+
+/run/printProgress 10000
+/run/beamOn 100000

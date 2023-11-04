@@ -1,0 +1,90 @@
+#######################################################
+#
+# Run macro file with scoring probes 
+#######################################################
+# Set verbosities
+#######################################################
+/control/saveHistory
+/run/verbose 2
+/control/verbose 2
+/event/verbose 0
+/tracking/verbose 0
+/process/verbose 0
+
+#######################################################
+# Set number of threads
+#######################################################
+#/run/numberOfThreads 0
+
+#######################################################
+# Geant4 initialization
+#######################################################
+/run/initialize
+
+#######################################################
+# Selection of particle source
+#######################################################
+/gun/particle e-
+/gun/position 0 0 11.3 m
+/gun/momentum 0 0 -1.0 GeV
+/gun/energy 1 GeV
+
+# Gaussian particle gun (implemented by Salman)
+/gun/gaussian/SigmaX 2.0 mm
+/gun/gaussian/SigmaY 2.0 mm
+#
+/gun/gaussian/PosX0 1.0 mm
+/gun/gaussian/PosY0 1.0 mm
+/gun/gaussian/PosZ0 110.0 mm
+#
+/gun/gaussian/setDirection 0 0 -1.0 GeV 
+
+#######################################################
+# Define probes and scorers
+#######################################################
+#/score/create/probe Probes 1. cm
+#/score/probe/locate 0. 0. -49. cm
+#/score/probe/locate 0. 0. -2. cm
+#/score/probe/locate 0. 0. 0. cm
+#/score/probe/locate 0. 0. 0. cm
+/score/create/realWorldLogVol worldP
+/score/quantity/energyDeposit eDep
+/score/quantity/flatSurfaceCurrent particleIn 
+/score/filter/particle eMinusFilter e-
+/score/close
+
+#######################################################
+# Setup visualization for interactive mode
+#######################################################
+/run/beamOn 0
+/control/execute vis.mac
+#######################################################
+# Define histograms for batch mode
+#######################################################
+/analysis/h1/create eDep Probes_eDep 100 0.01 2000. MeV 
+
+/score/fill1D 1 Probes eDep 0
+/score/fill1D 1 Probes eDep 1
+/score/fill1D 1 Probes eDep 2
+/score/fill1D 1 Probes eDep 3
+
+/analysis/h1/create particleIn Probes_particleIn  100 0. 100. MeV 
+/score/fill1D 2 Probes particleIn 0
+/score/fill1D 2 Probes particleIn 1
+/score/fill1D 2 Probes particleIn 2
+/score/fill1D 2 Probes particleIn 3
+#
+# filling histograms
+#
+
+
+
+#######################################################
+# Run for batch mode
+#######################################################
+/run/eventModulo 0 1
+/run/printProgress 10000
+/run/beamOn 10
+/score/dumpAllQuantitiesToFile Probes Probes.csv
+
+exit

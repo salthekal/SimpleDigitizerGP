@@ -1,0 +1,127 @@
+#######################################################
+# Set verbosities
+#######################################################
+/control/saveHistory
+/run/verbose 2
+/control/verbose 2
+/event/verbose 0
+/tracking/verbose 0
+/process/verbose 0
+
+#######################################################
+# Geant4 initialization
+#######################################################
+/run/initialize
+
+#######################################################
+# Selection of particle source
+#######################################################
+/gun/particle e-
+/gun/position 0 0 11.3 m
+/gun/momentum 0 0 -1.0 GeV
+/gun/energy 1 GeV
+
+# Gaussian particle gun (implemented by Salman)
+/gun/gaussian/SigmaX 1.0 mm
+/gun/gaussian/SigmaY 0. mm
+#
+/gun/gaussian/PosX0 1.0 mm
+/gun/gaussian/PosY0 1.0 mm
+/gun/gaussian/PosZ0 110.0 mm
+#
+/gun/gaussian/setDirection 0 0 -1.0 GeV 
+
+
+########################################
+#
+/score/create/boxMesh boxMesh_1
+#
+/score/mesh/boxSize 1. 1. 1. cm
+/score/mesh/translate/xyz 0. 0. -49. cm
+/score/mesh/nBin 30 30 30
+#
+/score/quantity/energyDeposit eDep
+/score/quantity/flatSurfaceCurrent particleIn 
+/score/filter/particle eMinusFilter e-
+/score/quantity/nOfSecondary nSecondary 
+# Note: Posiible scoreres: nOfCollision (number of steps made by physics interaction)
+# nOfTrack (number of tracks in the volume including both passing and terminated tracks)
+# cellCharge (deposited charge in the volume)
+/score/close
+#
+########################################
+#
+/score/create/boxMesh boxMesh_2
+#
+/score/mesh/boxSize 1. 1. 1. cm
+/score/mesh/translate/xyz 0. 0. -2. cm
+/score/mesh/nBin 30 30 30
+#
+/score/quantity/energyDeposit eDep
+/score/quantity/flatSurfaceCurrent particleIn 
+/score/filter/particle eMinusFilter e-
+/score/quantity/nOfSecondary nSecondary 
+#
+/score/close
+#
+########################################
+#
+/score/create/boxMesh boxMesh_3
+#
+/score/mesh/boxSize 1. 1. 1. cm
+/score/mesh/translate/xyz 0. 0. 0. cm
+/score/mesh/nBin 30 30 30
+#
+/score/quantity/energyDeposit eDep
+/score/quantity/flatSurfaceCurrent particleIn 
+/score/filter/particle eMinusFilter e-
+/score/quantity/nOfSecondary nSecondary 
+#
+/score/close
+#
+########################################
+#
+/score/list
+
+#######################################################
+# Setup visualization for interactive mode / drawing slices
+#######################################################
+#/run/beamOn 0
+#/control/execute drawSlice.mac iColumn 0
+/run/beamOn 1000
+
+#
+########################################
+#
+# drawing projections
+#
+/score/drawProjection boxMesh_1 eDep 
+/score/drawProjection boxMesh_1 particleIn 
+/score/drawProjection boxMesh_1 nSecondary
+/score/drawProjection boxMesh_2 eDep 
+/score/drawProjection boxMesh_2 particleIn 
+/score/drawProjection boxMesh_2 nSecondary
+/score/drawProjection boxMesh_3 eDep 
+/score/drawProjection boxMesh_3 particleIn
+/score/drawProjection boxMesh_3 nSecondary
+#
+########################################
+#
+# drawing slices
+#
+
+########################################
+#
+# Dump scorers to a file
+#
+/score/dumpQuantityToFile boxMesh_1 eDep eDep1.txt
+/score/dumpQuantityToFile boxMesh_1 particleIn particleIn1.txt
+/score/dumpQuantityToFile boxMesh_1 nSecondary nSecondary1.txt
+/score/dumpQuantityToFile boxMesh_2 eDep eDep2.txt
+/score/dumpQuantityToFile boxMesh_2 particleIn particleIn2.txt
+/score/dumpQuantityToFile boxMesh_2 nSecondary nSecondary2.txt
+/score/dumpQuantityToFile boxMesh_3 eDep eDep3.txt
+/score/dumpQuantityToFile boxMesh_3 particleIn particleIn3.txt
+/score/dumpQuantityToFile boxMesh_3 nSecondary nSecondary3.txt
+#
+#

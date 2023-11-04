@@ -1,0 +1,7 @@
+/gun/particle e-
+/gun/position 0 0 11.3 m
+/gun/momentum 0 0 -1.0 GeV
+/gun/energy 1 GeV
+/run/beamOn 1
+
+#/tracking/verbose 2

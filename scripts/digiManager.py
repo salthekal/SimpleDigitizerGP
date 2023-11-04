@@ -297,9 +297,9 @@ def makeJobs(mcPath: str, bunchParNb: int, phaseSpace: np.array):
 
 if __name__=="__main__":
     pass
-    #logging.setLevel(10)       # This correspond to debug mode
-    #pipeline()
-    #exit()
+    logging.setLevel(10)       # This correspond to debug mode
+    pipeline()
+    exit()
     pS = makePhaseSpace()
     makeJobs("build/dummyRun_100k.root", 10000, pS)
 
